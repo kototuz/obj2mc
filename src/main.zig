@@ -20,8 +20,10 @@ const TRIANGLE = [_]Mat4 {
 };
 
 const CmdPrinter = struct {
-    file:   std.fs.File,
-    writer: std.fs.File.Writer,
+    file:           std.fs.File,
+    writer:         std.fs.File.Writer,
+    cmd_count:      usize = 0,
+    triangle_count: usize = 0,
 
     pub fn init(file_name: []const u8) !CmdPrinter {
         const file = std.fs.cwd().createFile(file_name, .{}) catch |err| {
@@ -40,7 +42,7 @@ const CmdPrinter = struct {
     }
 
     pub fn printTriangleRendering(
-        self: CmdPrinter,
+        self: *CmdPrinter,
         p1: Vec3,
         p2: Vec3,
         p3: Vec3,
@@ -77,10 +79,12 @@ const CmdPrinter = struct {
                 .{ color, rot.translate(p1).mul(t) }
             );
         }
+
+        self.triangle_count += 1;
     }
 
     pub fn print(
-        self: CmdPrinter,
+        self: *CmdPrinter,
         comptime format: []const u8,
         args: anytype
     ) !void {
@@ -88,6 +92,8 @@ const CmdPrinter = struct {
             std.log.err("failed to print command: {}", .{err});
             return err;
         };
+
+        self.cmd_count += 1;
     }
 };
 
@@ -150,7 +156,7 @@ pub fn main() !void {
     defer c.fast_obj_destroy(meshPtr);
     const mesh = meshPtr[0];
 
-    const printer = CmdPrinter.init(output) catch return;
+    var printer = CmdPrinter.init(output) catch return;
     defer printer.deinit();
 
     // TODO: Summon text displays with specific tag.
@@ -177,5 +183,7 @@ pub fn main() !void {
         printer.printTriangleRendering(pos1, pos2, pos3, color) catch return;
     }
 
-    // TODO: Report generated command count
+    std.log.info("commands generated:  {}", .{printer.cmd_count});
+    std.log.info("triangles generated: {}", .{printer.triangle_count});
+    std.log.info("entities generated:  {}", .{printer.triangle_count*3});
 }
