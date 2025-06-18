@@ -25,7 +25,7 @@ const CmdPrinter = struct {
 
     pub fn init(file_name: []const u8) !CmdPrinter {
         const file = std.fs.cwd().createFile(file_name, .{}) catch |err| {
-            std.debug.print("Failed to open file '{s}': {}\n", .{file_name, err});
+            std.log.err("failed to open file '{s}': {}", .{file_name, err});
             return err;
         };
 
@@ -85,7 +85,7 @@ const CmdPrinter = struct {
         args: anytype
     ) !void {
         self.writer.print(format ++ "\n", args) catch |err| {
-            std.debug.print("Failed to print command: {}\n", .{err});
+            std.log.err("failed to print command: {}", .{err});
             return err;
         };
     }
@@ -128,23 +128,23 @@ fn calcColor(normal: Vec3) Color {
 
 pub fn main() !void {
     var args = std.process.argsWithAllocator(std.heap.page_allocator) catch |err| {
-        std.debug.print("Failed to get arguments: {}\n", err);
+        std.log.err("failed to get arguments: {}", err);
         return;
     };
     defer args.deinit();
 
     const prog_name = args.next().?;
     const input = args.next() orelse {
-        std.debug.print("Usage: {s} <input.obj> <output.mcfunction>\n", .{prog_name});
+        std.debug.print("usage: {s} <input.obj> <output.mcfunction>\n", .{prog_name});
         return;
     };
     const output = args.next() orelse {
-        std.debug.print("Usage: {s} <input.obj> <output.mcfunction>\n", .{prog_name});
+        std.debug.print("usage: {s} <input.obj> <output.mcfunction>\n", .{prog_name});
         return;
     };
 
     const meshPtr = c.fast_obj_read(input) orelse {
-        std.debug.print("Failed to read '{s}'\n", .{input});
+        std.log.err("failed to read '{s}'", .{input});
         return;
     };
     defer c.fast_obj_destroy(meshPtr);
