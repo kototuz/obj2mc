@@ -10,7 +10,7 @@ const Vec3 = za.Vec3;
 
 const SQUARE = Mat4
     .identity()
-    .scale(Vec3.new(8.0, 3.638, 1.0))
+    .scale(Vec3.new(8.0, 4.0, 1.0))
     .translate(Vec3.new(0.4, 0, 0));
 
 const TRIANGLE = [_]Mat4 {
@@ -73,7 +73,7 @@ const CmdPrinter = struct {
                 .scale(Vec3.new(width, height, 1));
 
             try self.print(
-                "summon minecraft:text_display ~ ~ ~ {{text:'{{text:\" \"}}',background:{d},transformation:{},brightness:{{block:15,sky:15}}}}",
+                "summon minecraft:text_display ~ ~ ~ {{text:{{text:\" \"}},background:{d},transformation:{},brightness:{{block:15,sky:15}}}}",
                 .{ color, rot.translate(p1).mul(t) }
             );
         }
