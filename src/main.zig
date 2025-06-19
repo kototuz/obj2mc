@@ -23,30 +23,36 @@ const LIGHT = Vec3.new(1, 1, 1).norm();
 
 const DEFAULT_COLOR = Color.new(255, 255, 255, 255);
 
-const CmdPrinter = struct {
+const ModelBuilder = struct {
     file:           std.fs.File,
     writer:         std.fs.File.Writer,
     cmd_count:      usize = 0,
     triangle_count: usize = 0,
+    tag_name:       []const u8,
 
-    pub fn init(file_name: []const u8) !CmdPrinter {
+    pub fn init(file_name: []const u8) !ModelBuilder {
         const file = std.fs.cwd().createFile(file_name, .{}) catch |err| {
             std.log.err("failed to open file '{s}': {}", .{file_name, err});
             return err;
         };
 
-        return .{
+        var self = ModelBuilder{
             .file = file,
-            .writer = file.writer()
+            .writer = file.writer(),
+            .tag_name = std.fs.path.stem(file_name),
         };
+
+        try self.print_cmd("kill @e[tag={s}]", .{self.tag_name});
+
+        return self;
     }
 
-    pub fn deinit(self: CmdPrinter) void {
+    pub fn deinit(self: ModelBuilder) void {
         self.file.close();
     }
 
-    pub fn printTriangleRendering(
-        self: *CmdPrinter,
+    pub fn buildTriangle(
+        self: *ModelBuilder,
         p1: Vec3,
         p2: Vec3,
         p3: Vec3,
@@ -78,17 +84,17 @@ const CmdPrinter = struct {
                 .shear(.{ .yx = shear })
                 .scale(Vec3.new(width, height, 1));
 
-            try self.print(
-                "summon minecraft:text_display ~ ~ ~ {{text:{{text:\" \"}},background:{d},transformation:{},brightness:{{block:15,sky:15}}}}",
-                .{ color, rot.translate(p1).mul(t) }
+            try self.print_cmd(
+                "summon minecraft:text_display ~ ~ ~ {{text:{{text:\" \"}},background:{d},transformation:{},brightness:{{block:15,sky:15}},Tags:[\"{s}\"]}}",
+                .{ color, rot.translate(p1).mul(t), self.tag_name }
             );
         }
 
         self.triangle_count += 1;
     }
 
-    pub fn print(
-        self: *CmdPrinter,
+    fn print_cmd(
+        self: *ModelBuilder,
         comptime format: []const u8,
         args: anytype
     ) !void {
@@ -158,12 +164,8 @@ pub fn main() !void {
     defer c.fast_obj_destroy(meshPtr);
     const mesh = meshPtr[0];
 
-    var printer = CmdPrinter.init(output) catch return;
-    defer printer.deinit();
-
-    // TODO: Summon text displays with specific tag.
-    //       It will let us to kill only the specific model
-    printer.print("kill @e[type=minecraft:text_display]", .{}) catch return;
+    var builder = ModelBuilder.init(output) catch return;
+    defer builder.deinit();
 
     for (0..mesh.face_count) |i| {
         const vertex_count = mesh.face_vertices[i];
@@ -192,13 +194,13 @@ pub fn main() !void {
         }
 
         const normal = Vec3.fromSlice(mesh.normals[idx1.n*3..idx1.n*3+3]);
-        printer.printTriangleRendering(
+        builder.buildTriangle(
             pos1, pos2, pos3,
             color.applyShadowShader(normal).asARGB()
         ) catch return;
     }
 
-    std.log.info("commands generated:  {}", .{printer.cmd_count});
-    std.log.info("triangles generated: {}", .{printer.triangle_count});
-    std.log.info("entities generated:  {}", .{printer.triangle_count*3});
+    std.log.info("commands generated:  {}", .{builder.cmd_count});
+    std.log.info("triangles generated: {}", .{builder.triangle_count});
+    std.log.info("entities generated:  {}", .{builder.triangle_count*3});
 }
