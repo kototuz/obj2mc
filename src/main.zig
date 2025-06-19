@@ -19,6 +19,10 @@ const TRIANGLE = [_]Mat4 {
     Mat4.identity().mul(SQUARE).scale(Vec3.set(0.5)).translate(Vec3.new(0, 0.5, 0)).shear(.{ .xy = -1 }),
 };
 
+const LIGHT = Vec3.new(1, 1, 1).norm();
+
+const DEFAULT_COLOR = Color.new(255, 255, 255, 255);
+
 const CmdPrinter = struct {
     file:           std.fs.File,
     writer:         std.fs.File.Writer,
@@ -104,6 +108,22 @@ const Color = struct {
         return .{ .a = a, .r = r, .g = g, .b = b };
     }
 
+    pub fn applyShadowShader(self: Color, normal: Vec3) Color {
+        const light_dot = normal.dot(LIGHT);
+        const brightness = @max(@min(2*(light_dot + 1)/2 - 1, 1.0), 0.5);
+
+        const r: f32 = @floatFromInt(self.r);
+        const g: f32 = @floatFromInt(self.g);
+        const b: f32 = @floatFromInt(self.b);
+
+        return Color.new(
+            255,
+            @intFromFloat(@min(@max(r*brightness, 0), 255)),
+            @intFromFloat(@min(@max(g*brightness, 0), 255)),
+            @intFromFloat(@min(@max(b*brightness, 0), 255)),
+        );
+    }
+
     pub fn asARGB(self: Color) i32 {
         var res: i32 = 0;
         res |= @as(i32, self.a) << 24;
@@ -113,24 +133,6 @@ const Color = struct {
         return res;
     }
 };
-
-const COLOR = Color.new(255, 255, 255, 255);
-const LIGHT = Vec3.new(1, 1, 1).norm();
-fn calcColor(normal: Vec3) Color {
-    const light_dot = normal.dot(LIGHT);
-    const brightness = @max(@min(2*(light_dot + 1)/2 - 1, 1.0), 0.5);
-
-    const r: f32 = @floatFromInt(COLOR.r);
-    const g: f32 = @floatFromInt(COLOR.g);
-    const b: f32 = @floatFromInt(COLOR.b);
-
-    return Color.new(
-        255,
-        @intFromFloat(@min(@max(r*brightness, 0), 255)),
-        @intFromFloat(@min(@max(g*brightness, 0), 255)),
-        @intFromFloat(@min(@max(b*brightness, 0), 255)),
-    );
-}
 
 pub fn main() !void {
     var args = std.process.argsWithAllocator(std.heap.page_allocator) catch |err| {
@@ -175,12 +177,25 @@ pub fn main() !void {
         const pos2 = Vec3.fromSlice(mesh.positions[idx2.p*3..idx2.p*3+3]);
         const pos3 = Vec3.fromSlice(mesh.positions[idx3.p*3..idx3.p*3+3]);
 
+        var color: Color = undefined;
+        const material_idx = mesh.face_materials[i];
+        if (material_idx < mesh.material_count) { 
+            const material = mesh.materials[material_idx];
+            color = Color.new(
+                255,
+                @intFromFloat(material.Kd[0]/1.0*255),
+                @intFromFloat(material.Kd[1]/1.0*255),
+                @intFromFloat(material.Kd[2]/1.0*255),
+            );
+        } else {
+            color = DEFAULT_COLOR;
+        }
+
         const normal = Vec3.fromSlice(mesh.normals[idx1.n*3..idx1.n*3+3]);
-
-        // TODO: Color from .mtl file
-        const color = calcColor(normal).asARGB();
-
-        printer.printTriangleRendering(pos1, pos2, pos3, color) catch return;
+        printer.printTriangleRendering(
+            pos1, pos2, pos3,
+            color.applyShadowShader(normal).asARGB()
+        ) catch return;
     }
 
     std.log.info("commands generated:  {}", .{printer.cmd_count});
